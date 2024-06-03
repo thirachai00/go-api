@@ -181,6 +181,29 @@ func customerById(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
+		row, err := db.Query("SELECT * FROM Customers WHERE id = ? ", id)
+		if err != nil {
+			fmt.Printf("error : %v\n", err)
+			message := []byte(`{"message": "Error prepare database"}`)
+			setJsonResp(message, http.StatusInternalServerError, res)
+			return
+		}
+		defer row.Close()
+
+		customer := model.Customer{}
+		for row.Next() { // Iterate and fetch the records from result cursor
+			var id int
+			var name string
+			var age int
+			row.Scan(&id, &name, &age)
+			customer = model.Customer{ID: id, Name: name, Age: age}
+		}
+		if customer.Name == "" {
+			message := []byte(`{"message": "not found"}`)
+			setJsonResp(message, http.StatusNotFound, res)
+			return
+		}
+
 		fmt.Printf("name : %v | age : %v\n", updateCustomer.Name, updateCustomer.Age)
 
 		customerSQL := `UPDATE Customers SET name = ? , age = ? WHERE id = ?`
@@ -208,7 +231,8 @@ func customerById(res http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
-	initDatabase()
+	initDatabase() //new database every time
+	fmt.Println("Server start port: 8080")
 	http.HandleFunc("/", func(res http.ResponseWriter, r *http.Request) {
 		message := []byte(`{"message": "Server up and running"}`)
 		setJsonResp(message, http.StatusOK, res)
