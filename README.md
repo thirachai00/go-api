@@ -1,7 +1,9 @@
 # go-api
 Teerachai's Go test.
 
-#in main.go line 183 is initial database mock 9 row data every time
+#STEP RUN
+1. in terminal use 'go run main.go' then can use json collection called this api.
+2. in main.go line 183 is initial database mock 9 row data every time. (comment for not use)
 
 #json api collection
 
