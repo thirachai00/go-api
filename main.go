@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"gotest/database"
 	"gotest/model"
-	"log"
+	"gotest/service"
 	"net/http"
 	"os"
 
@@ -25,22 +25,12 @@ func customer(res http.ResponseWriter, req *http.Request) {
 	defer db.Close()
 
 	if req.Method == "GET" { //Get all
-		var customers []model.Customer
-		row, err := db.Query("SELECT * FROM Customers ORDER BY id")
+
+		customers, err := service.GetAllCustomer(db)
 		if err != nil {
 			message := []byte(`{"message": "query error"}`)
 			setJsonResp(message, http.StatusInternalServerError, res)
 			return
-		}
-		defer row.Close()
-
-		for row.Next() { // Iterate and fetch the records from result cursor
-			var id int
-			var name string
-			var age int
-			row.Scan(&id, &name, &age)
-			log.Println("Customer: ", name, " ", age)
-			customers = append(customers, model.Customer{ID: id, Name: name, Age: age})
 		}
 
 		response := model.JsonResponse{
@@ -70,15 +60,7 @@ func customer(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		insertCustomerSQL := `INSERT INTO Customers(name, age) VALUES (?, ?)`
-		statement, err := db.Prepare(insertCustomerSQL) // Prepare statement.
-		// This is good to avoid SQL injections
-		if err != nil {
-			message := []byte(`{"message": "Error prepare database"}`)
-			setJsonResp(message, http.StatusInternalServerError, res)
-			return
-		}
-		_, err = statement.Exec(customer.Name, customer.Age)
+		err = service.CreateCustomer(customer, db)
 		if err != nil {
 			message := []byte(`{"message": "insert database error"}`)
 			setJsonResp(message, http.StatusInternalServerError, res)
@@ -110,22 +92,17 @@ func customerById(res http.ResponseWriter, req *http.Request) {
 	defer db.Close()
 
 	if req.Method == "GET" {
-		row, err := db.Query("SELECT * FROM Customers WHERE id = ? ", id)
+		customer, err := service.GetCustomerById(id, db)
 		if err != nil {
-			fmt.Printf("error : %v\n", err)
-			message := []byte(`{"message": "Error prepare database"}`)
+			message := []byte(`{"message": "Error GetCustomerById"}`)
 			setJsonResp(message, http.StatusInternalServerError, res)
 			return
 		}
-		defer row.Close()
 
-		customer := model.Customer{}
-		for row.Next() { // Iterate and fetch the records from result cursor
-			var id int
-			var name string
-			var age int
-			row.Scan(&id, &name, &age)
-			customer = model.Customer{ID: id, Name: name, Age: age}
+		if customer.Name == "" {
+			message := []byte(`{"message": "not found"}`)
+			setJsonResp(message, http.StatusNotFound, res)
+			return
 		}
 
 		response := model.JsonResponse{
@@ -146,18 +123,9 @@ func customerById(res http.ResponseWriter, req *http.Request) {
 	}
 
 	if req.Method == "DELETE" {
-		insertCustomerSQL := `DELETE FROM Customers WHERE id = ?`
-		statement, err := db.Prepare(insertCustomerSQL) // Prepare statement.
+		err := service.DeleteCustomer(id, db)
 		if err != nil {
-			fmt.Printf("error : %v\n", err)
-			message := []byte(`{"message": "Error prepare database"}`)
-			setJsonResp(message, http.StatusInternalServerError, res)
-			return
-		}
-		_, err = statement.Exec(id)
-		if err != nil {
-			fmt.Printf("error : %v\n", err)
-			message := []byte(`{"message": "Error execute database"}`)
+			message := []byte(`{"message": "Error delete data"}`)
 			setJsonResp(message, http.StatusInternalServerError, res)
 			return
 		}
@@ -182,23 +150,13 @@ func customerById(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		row, err := db.Query("SELECT * FROM Customers WHERE id = ? ", id)
+		customer, err := service.GetCustomerById(id, db)
 		if err != nil {
-			fmt.Printf("error : %v\n", err)
-			message := []byte(`{"message": "Error prepare database"}`)
+			message := []byte(`{"message": "Error GetCustomerById"}`)
 			setJsonResp(message, http.StatusInternalServerError, res)
 			return
 		}
-		defer row.Close()
 
-		customer := model.Customer{}
-		for row.Next() { // Iterate and fetch the records from result cursor
-			var id int
-			var name string
-			var age int
-			row.Scan(&id, &name, &age)
-			customer = model.Customer{ID: id, Name: name, Age: age}
-		}
 		if customer.Name == "" {
 			message := []byte(`{"message": "not found"}`)
 			setJsonResp(message, http.StatusNotFound, res)
@@ -207,19 +165,9 @@ func customerById(res http.ResponseWriter, req *http.Request) {
 
 		fmt.Printf("name : %v | age : %v\n", updateCustomer.Name, updateCustomer.Age)
 
-		customerSQL := `UPDATE Customers SET name = ? , age = ? WHERE id = ?`
-		statement, err := db.Prepare(customerSQL) // Prepare statement.
+		err = service.UpdateCustomer(id, updateCustomer, db)
 		if err != nil {
-			fmt.Printf("error : %v\n", err)
-			message := []byte(`{"message": "Error prepare database"}`)
-			setJsonResp(message, http.StatusInternalServerError, res)
-			return
-		}
-
-		_, err = statement.Exec(updateCustomer.Name, updateCustomer.Age, id)
-		if err != nil {
-			fmt.Printf("error : %v\n", err)
-			message := []byte(`{"message": "Error execute database"}`)
+			message := []byte(`{"message": "Error UpdateCustomer"}`)
 			setJsonResp(message, http.StatusInternalServerError, res)
 			return
 		}
